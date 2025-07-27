@@ -10,10 +10,12 @@ from typing import Any, Dict
 import redis
 
 from distributed_core.core.config import settings  # Import settings
-from distributed_core.services.jobs.base import JobStorage
+from distributed_core.plugins import register_plugin
+from distributed_core.services.jobs.interface import JobStorageInterface
 
 
-class RedisJobStorage(JobStorage):
+@register_plugin(JobStorageInterface, name="redis")
+class RedisJobStorage(JobStorageInterface):
     """
     A Redis-backed implementation of the JobStorage service.
     """

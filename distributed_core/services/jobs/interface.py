@@ -1,18 +1,19 @@
-# pylint: disable=R0903
 """
-app/services/jobs/base.py
+app/services/jobs/interface.py
 
-This module defines the base classes for job storage and background
-task execution services.
+This module defines the interfaces for job-related services.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, Dict
 
+from distributed_core.plugins import define_interface
 
-class JobStorage(ABC):
+
+@define_interface
+class JobStorageInterface:
     """
-    Base class for job storage services.
+    Interface for job storage services.
     """
 
     @abstractmethod
@@ -34,9 +35,10 @@ class JobStorage(ABC):
         """
 
 
-class BackgroundTaskRunner(ABC):
+@define_interface
+class BackgroundTaskRunnerInterface:
     """
-    Base class for background task execution services.
+    Interface for background task execution services.
     """
 
     @abstractmethod

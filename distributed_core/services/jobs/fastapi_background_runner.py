@@ -10,10 +10,12 @@ from typing import Callable
 
 from fastapi import BackgroundTasks
 
-from distributed_core.services.jobs.base import BackgroundTaskRunner
+from distributed_core.plugins import register_plugin
+from distributed_core.services.jobs.interface import BackgroundTaskRunnerInterface
 
 
-class FastAPIBackgroundRunner(BackgroundTaskRunner):
+@register_plugin(BackgroundTaskRunnerInterface, name="fastapi")
+class FastAPIBackgroundRunner(BackgroundTaskRunnerInterface):
     """
     An implementation of the BackgroundTaskRunner service using FastAPI's
     BackgroundTasks.

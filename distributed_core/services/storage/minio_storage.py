@@ -13,12 +13,14 @@ from minio.error import S3Error
 from distributed_core.core.config import (
     settings,
 )
-from distributed_core.services.storage.base import StorageService
+from distributed_core.plugins import register_plugin
+from distributed_core.services.storage.interface import StorageInterface
 
 logger = logging.getLogger(__name__)
 
 
-class MinIOStorageService(StorageService):
+@register_plugin(StorageInterface, name="minio")
+class MinIOStorageService(StorageInterface):
     """
     A MinIO implementation of the StorageService.
     """

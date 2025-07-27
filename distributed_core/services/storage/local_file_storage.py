@@ -9,12 +9,14 @@ import os
 from typing import BinaryIO
 
 from distributed_core.core.config import settings
-from distributed_core.services.storage.base import StorageService
+from distributed_core.plugins import register_plugin
+from distributed_core.services.storage.interface import StorageInterface
 
 logger = logging.getLogger(__name__)
 
 
-class LocalFileStorageService(StorageService):
+@register_plugin(StorageInterface, name="local")
+class LocalFileStorageService(StorageInterface):
     """
     A local file system implementation of the StorageService.
     """

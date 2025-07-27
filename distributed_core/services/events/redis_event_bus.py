@@ -11,12 +11,12 @@ from typing import Any, Callable, Dict
 import redis
 
 from distributed_core.core.config import settings
-from distributed_core.services.events.base import EventBus
+from distributed_core.plugins import register_plugin
+from distributed_core.services.events.interface import EventBusInterface
 
-logger = logging.getLogger(__name__)
 
-
-class RedisEventBus(EventBus):
+@register_plugin(EventBusInterface, name="redis")
+class RedisEventBus(EventBusInterface):
     """
     A Redis Pub/Sub implementation of the EventBus service.
     """

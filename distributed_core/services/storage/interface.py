@@ -1,14 +1,17 @@
 """
-app/services/storage/base.py
+app/services/storage/interface.py
 
-This module defines the base classes for storage services.
+This module defines the interface for storage services.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import BinaryIO
 
+from distributed_core.plugins import define_interface
 
-class StorageService(ABC):
+
+@define_interface
+class StorageInterface:
     """
     Base class for storage services.
     """
