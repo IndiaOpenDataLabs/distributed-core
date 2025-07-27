@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "distributed-core"
+version = "0.1.0"
+description = "Core components for distributed applications."
+authors = [
+    { name="Madhav Kandukuri", email="madhav165@gmail.com" }
+]
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.11,<=3.14"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+
+dependencies = [
+    "redis>=6.2.0",
+    "minio>=7.2.16",
+    "fastapi>=0.116.1",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+]
+
+[tool.setuptools]
+packages = ["distributed_core"]
