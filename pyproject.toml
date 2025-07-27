@@ -27,3 +27,9 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["distributed_core"]
+
+[dependency-groups]
+dev = [
+    "twine>=6.1.0",
+    "build>=1.2.2",
+]
