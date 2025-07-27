@@ -5,7 +5,9 @@ This module defines the manager for job-related services.
 """
 
 from distributed_core.services.jobs.base import BackgroundTaskRunner, JobStorage
-from distributed_core.services.jobs.fastapi_background_runner import FastAPIBackgroundRunner
+from distributed_core.services.jobs.fastapi_background_runner import (
+    FastAPIBackgroundRunner,
+)
 from distributed_core.services.jobs.redis_job_storage import RedisJobStorage
 
 

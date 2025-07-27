@@ -1,3 +1,4 @@
+# pylint: disable=R0903
 """
 app/services/storage/manager.py
 

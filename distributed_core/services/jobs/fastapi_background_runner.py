@@ -1,3 +1,4 @@
+# pylint: disable=R0903
 """
 app/services/fastapi_background_runner.py
 

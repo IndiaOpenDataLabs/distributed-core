@@ -25,7 +25,6 @@ help:
 		install:"Install project and development dependencies using uv" \
 		sync:"Sync the virtual environment with all groups using uv" \
 		check-env:"Check if a virtual environment is active" \
-		serve:"Run the FastAPI application using Gunicorn" \
 		; do \
 	  name=$${td%%:*}; desc=$${td#*:}; \
 	  printf "  $(BOLD)%s$(RESET) — %s\n" "$$name" "$$desc"; \
@@ -157,11 +156,7 @@ publish-pypi: build
 	@uv run twine upload dist/*
 	@printf "$(GREEN)Uploaded to PyPI!$(RESET)\n"
 
-serve: install
 
-	@printf "$(YELLOW)Starting development server…$(RESET)\n"
-	@. $(VENV_DIR)/bin/activate && \
-	gunicorn -c run_gunicorn.py app.main:app
 
 docker-build:
 	@printf "$(YELLOW)Building Docker image for the application with buildx...$(RESET)\n"

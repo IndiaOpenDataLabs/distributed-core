@@ -32,4 +32,27 @@ packages = ["distributed_core"]
 dev = [
     "twine>=6.1.0",
     "build>=1.2.2",
+    "uv",
+    "ruff",
+    "pylint",
+]
+
+[tool.ruff]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.pylint]
+ignore = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
 ]
