@@ -6,7 +6,7 @@ This module provides an in-memory implementation of the JobStorage service.
 
 from typing import Any, Dict
 
-from distributed_core.plugins import register_plugin
+from distributed_core.core.plugins import register_plugin
 from distributed_core.services.jobs.interface import JobStorageInterface
 
 

@@ -10,7 +10,7 @@ from typing import Any, Dict
 import redis
 
 from distributed_core.core.config import settings  # Import settings
-from distributed_core.plugins import register_plugin
+from distributed_core.core.plugins import register_plugin
 from distributed_core.services.jobs.interface import JobStorageInterface
 
 

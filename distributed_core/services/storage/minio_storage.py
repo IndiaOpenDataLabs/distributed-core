@@ -13,7 +13,7 @@ from minio.error import S3Error
 from distributed_core.core.config import (
     settings,
 )
-from distributed_core.plugins import register_plugin
+from distributed_core.core.plugins import register_plugin
 from distributed_core.services.storage.interface import StorageInterface
 
 logger = logging.getLogger(__name__)

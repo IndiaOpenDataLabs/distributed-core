@@ -7,7 +7,7 @@ This module defines the interface for storage services.
 from abc import abstractmethod
 from typing import BinaryIO
 
-from distributed_core.plugins import define_interface
+from distributed_core.core.plugins import define_interface
 
 
 @define_interface

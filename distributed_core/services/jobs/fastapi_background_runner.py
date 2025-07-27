@@ -10,7 +10,7 @@ from typing import Callable
 
 from fastapi import BackgroundTasks
 
-from distributed_core.plugins import register_plugin
+from distributed_core.core.plugins import register_plugin
 from distributed_core.services.jobs.interface import BackgroundTaskRunnerInterface
 
 

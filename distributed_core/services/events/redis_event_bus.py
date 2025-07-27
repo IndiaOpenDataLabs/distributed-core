@@ -11,7 +11,7 @@ import logging
 import redis
 
 from distributed_core.core.config import settings
-from distributed_core.plugins import register_plugin
+from distributed_core.core.plugins import register_plugin
 from distributed_core.services.events.interface import EventBusInterface
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ This module defines the interfaces for job-related services.
 from abc import abstractmethod
 from typing import Any, Callable, Dict
 
-from distributed_core.plugins import define_interface
+from distributed_core.core.plugins import define_interface
 
 
 @define_interface
