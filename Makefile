@@ -14,6 +14,9 @@ YELLOW := $(CSI)0;33m
 MAGENTA := $(CSI)0;35m
 CYAN   := $(CSI)0;36m
 
+.ONESHELL:
+SHELL := /bin/bash
+
 .PHONY: help venv install lint format test clean build docker-build docker-compose-up docker-compose-logs docker-compose-stop docker-compose-down docker-clean-images
 
 help:
@@ -139,13 +142,15 @@ build: venv
 	@printf "$(GREEN)Distribution packages built in dist/$(RESET)\n"
 
 publish-test: build
-	@read -p "$(YELLOW)⚠️  Are you sure you want to upload to TestPyPI? [y/N] $(RESET)" ans; \
-	if [ "$ans" != "y" ]; then \
-	  echo "Aborted."; exit 0; \
-	fi; \
-	@printf "$(CYAN)Uploading to TestPyPI…$(RESET)\n"
-	@uv run twine upload --repository testpypi dist/*
-	@printf "$(GREEN)Uploaded to TestPyPI!$(RESET)\n"
+	@read -p "$(YELLOW)⚠️  Are you sure you want to upload to TestPyPI? [y/N] $(RESET)" ans
+	if [[ "$$ans" != "y" ]]; then
+	  echo "Aborted."
+	  exit 0
+	fi
+	printf "$(CYAN)Uploading to TestPyPI…$(RESET)\n"
+	uv run twine upload --repository testpypi dist/*
+	printf "$(GREEN)Uploaded to TestPyPI!$(RESET)\n"
+
 
 publish-pypi: build
 	@read -p "$(YELLOW)⚠️  Are you sure you want to upload to PyPI? This is a public release! [y/N] $(RESET)" ans; \

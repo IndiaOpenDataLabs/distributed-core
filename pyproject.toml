@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,8 @@ authors = [
     { name="Madhav Kandukuri", email="madhav165@gmail.com" }
 ]
 readme = "README.md"
-license = { file="LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<=3.14"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -25,8 +26,10 @@ dependencies = [
     "pydantic-settings>=2.10.1",
 ]
 
-[tool.setuptools]
-packages = ["distributed_core"]
+[tool.setuptools.packages.find]
+where    = ["./"]
+include  = ["distributed_core*"]
+exclude  = ["tests*"]
 
 [dependency-groups]
 dev = [
