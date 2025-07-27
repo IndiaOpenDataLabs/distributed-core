@@ -5,14 +5,14 @@ app/services/jobs/interface.py
 This module defines the interfaces for job-related services.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict
 
 from distributed_core.core.plugins import define_interface
 
 
 @define_interface
-class JobStorageInterface:
+class JobStorageInterface(ABC):
     """
     Interface for job storage services.
     """
@@ -37,7 +37,7 @@ class JobStorageInterface:
 
 
 @define_interface
-class BackgroundTaskRunnerInterface:
+class BackgroundTaskRunnerInterface(ABC):
     """
     Interface for background task execution services.
     """

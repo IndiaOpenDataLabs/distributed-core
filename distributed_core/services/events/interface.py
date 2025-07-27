@@ -4,14 +4,14 @@ app/services/events/interface.py
 This module defines the interface for event bus services.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from distributed_core.core.plugins import define_interface
 
 
 @define_interface
-class EventBusInterface:
+class EventBusInterface(ABC):
     """
     Interface for event bus services.
     """
