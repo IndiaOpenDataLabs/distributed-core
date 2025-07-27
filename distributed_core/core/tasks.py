@@ -8,8 +8,8 @@ The primary user-facing API for creating and managing distributed tasks.
 from functools import wraps
 from typing import Any, Callable, Type
 
-from distributed_core.behaviors import Behavior
-from distributed_core.plugins import PluginFactory
+from distributed_core.core.behaviors import Behavior
+from distributed_core.core.plugins import PluginFactory
 
 
 class Task:
