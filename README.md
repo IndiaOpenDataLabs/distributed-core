@@ -11,6 +11,7 @@ This library encapsulates common functionalities such as pluggable storage, even
 *   **Background Job Management:** Base classes and managers for handling background tasks, designed to be extensible for integration with robust job queues like Celery or RQ.
 *   **Generic Ingestion Utilities:** Common functions for processing document content (e.g., extracting text from `BytesIO` streams), making ingestion pipelines flexible.
 *   **Centralized Configuration:** A robust configuration loading mechanism using Pydantic settings, allowing for easy management via environment variables.
+*   **Extensible Task Management:** A flexible system for defining and enhancing tasks with pluggable behaviors, leveraging a generic plugin architecture.
 
 ## 🚀 Installation
 
@@ -108,6 +109,110 @@ my_ingester = MyCustomIngestionService()
 result = my_ingester.ingest(doc_data)
 print(result)
 ```
+
+### Extensible Task Management
+
+The `distributed-core` library provides a flexible task management system that allows you to define tasks and enhance them with various behaviors using a plugin architecture.
+
+#### Defining Behaviors and Plugins
+
+First, define an interface for your behavior using `@define_interface` and then implement concrete plugins using `@register_plugin`.
+
+```python
+from distributed_core.behaviors import Behavior
+from distributed_core.plugins import define_interface, register_plugin
+from typing import Any, Callable
+
+@define_interface
+class LoggingBehavior(Behavior):
+    def execute(self, task_func: Callable, *args: Any, **kwargs: Any) -> Any:
+        print(f"Before executing task: {task_func.__name__}")
+        result = task_func(*args, **kwargs)
+        print(f"After executing task: {task_func.__name__}")
+        return result
+
+@register_plugin(interface_class=LoggingBehavior, name="simple_logger")
+class SimpleLoggingBehavior(LoggingBehavior):
+    pass # Implementation is in the interface for this simple case
+
+@define_interface
+class RetryBehavior(Behavior):
+    def execute(self, task_func: Callable, *args: Any, **kwargs: Any) -> Any:
+        max_retries = self.config.get("max_retries", 1)
+        for attempt in range(max_retries):
+            try:
+                return task_func(*args, **kwargs)
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    raise
+
+# Define a simple retry behavior directly within the example for clarity
+@register_plugin(interface_class=RetryBehavior, name="default")
+class DefaultRetryBehavior(RetryBehavior):
+    pass # Implementation is in the interface for this simple case
+
+```
+
+#### Using Tasks
+
+You can then apply these behaviors to your tasks:
+
+```python
+from distributed_core.tasks import Task
+from distributed_core.behaviors import Behavior
+from distributed_core.plugins import define_interface, register_plugin
+from typing import Any, Callable
+
+# Define behaviors directly within the example for clarity
+@define_interface
+class LoggingBehavior(Behavior):
+    def execute(self, task_func: Callable, *args: Any, **kwargs: Any) -> Any:
+        print(f"Before executing task: {task_func.__name__}")
+        result = task_func(*args, **kwargs)
+        print(f"After executing task: {task_func.__name__}")
+        return result
+
+@register_plugin(interface_class=LoggingBehavior, name="simple_logger")
+class SimpleLoggingBehavior(LoggingBehavior):
+    pass # Implementation is in the interface for this simple case
+
+@define_interface
+class RetryBehavior(Behavior):
+    def execute(self, task_func: Callable, *args: Any, **kwargs: Any) -> Any:
+        max_retries = self.config.get("max_retries", 1)
+        for attempt in range(max_retries):
+            try:
+                return task_func(*args, **kwargs)
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    raise
+
+@register_plugin(interface_class=RetryBehavior, name="default")
+class DefaultRetryBehavior(RetryBehavior):
+    pass # Implementation is in the interface for this simple case
+
+@Task
+def my_data_processing_task(data: str):
+    print(f"Processing data: {data}")
+    if data == "fail":
+        raise ValueError("Simulated processing failure!")
+    return f"Processed: {data}"
+
+# Apply behaviors
+my_data_processing_task.add_behavior(LoggingBehavior, plugin="simple_logger")
+my_data_processing_task.add_behavior(RetryBehavior, plugin="default", max_retries=3)
+
+# Execute the task
+my_data_processing_task.submit("sample_data")
+
+try:
+    my_data_processing_task.submit("fail")
+except ValueError as e:
+    print(f"Task ultimately failed: {e}")
+```
+
 
 ## 🧑‍💻 Development
 
