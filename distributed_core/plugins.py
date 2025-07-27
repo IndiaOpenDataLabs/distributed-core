@@ -3,6 +3,7 @@ distributed_core/plugins.py
 
 An interface-aware, contract-enforcing plugin system.
 """
+
 import abc
 from typing import Any, Dict, List, Type, TypeVar
 
@@ -31,7 +32,8 @@ class _PluginRegistry:
     """
 
     def __init__(self):
-        # { InterfaceClass -> {"plugins": {"name": PluginClass}, "contract": {"method1", "method2"}} }
+        # { InterfaceClass -> \
+        # {"plugins": {"name": PluginClass}, "contract": {"method1", "method2"}} }
         self._registry: Dict[Type[Any], Dict[str, Any]] = {}
 
     def define_interface(self, interface_class: Type[T]) -> Type[T]:

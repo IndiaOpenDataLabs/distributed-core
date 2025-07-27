@@ -1,8 +1,10 @@
+# pylint: disable=R0903
 """
 distributed_core/behaviors.py
 
 Defines the interface for task behaviors.
 """
+
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 

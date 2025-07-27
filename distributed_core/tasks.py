@@ -1,8 +1,10 @@
+# pylint: disable=R0903
 """
 distributed_core/tasks.py
 
 The primary user-facing API for creating and managing distributed tasks.
 """
+
 from functools import wraps
 from typing import Any, Callable, Type
 
