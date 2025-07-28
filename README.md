@@ -1,355 +1,172 @@
 # distributed-core
 
-A Python library for building powerful, pluggable, and distributed data processing pipelines.
+**Build Powerful, Pluggable & Distributed Data Pipelines**  
 
-## The Core Idea: Composable Pipelines
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://opensource.org/license/apache-2-0)
 
-`distributed-core` allows you to build complex workflows by assembling independent, reusable components. The core idea is to define a `PipelineContext` that holds all the data for an operation, and then build a `Pipeline` to process it.
+`distributed-core` is a Python framework for building composable data processing pipelines that scale from single machines to distributed systems. Create complex workflows by assembling reusable plugins, with built-in support for asynchronous processing, error handling, and distributed execution.
 
-The pipeline is a series of stages that can either filter/modify the context (`Execute` plugins) or hand it off to an external system for asynchronous processing (`Dispatch` plugins). This makes your system incredibly flexible, configurable, and easy to test.
+## Why distributed-core?
 
-## A Practical Example: Asynchronous File Upload
+✅ **Pluggable Architecture** - Swap implementations with configuration  
+✅ **Distributed-Ready** - Built-in async handoff for background processing  
+✅ **Type-Safe Contexts** - Pydantic-powered data validation  
+✅ **Declarative Pipelines** - Chain stages like building blocks  
+✅ **Production-Grade** - Coming soon: Error recovery, distributed locking, and observability  
 
-Let's demonstrate the power of this approach with a common use case: creating a FastAPI endpoint that accepts a file, uploads it to a cloud storage service, and then schedules a background task to process it.
+## Core Concepts
 
-### The Goal
-
-We want an endpoint `/upload` that:
-1.  Receives binary file content and creates a `FileJobContext`.
-2.  Uses an `Execute` plugin (`storage_write`) to save the file to a storage backend.
-3.  Uses a `Dispatch` plugin (`schedule_job`) to enqueue the rest of the pipeline for background processing.
-4.  Returns a job ID to the client immediately.
-
-### Step 1: Define the Context
-
-The context holds all the data needed for the pipeline.
-
+### 1. PipelineContext
+Your data container - defines inputs/outputs for pipeline operations:
 ```python
-# app/contexts.py
-from fastapi import BackgroundTasks
-from distributed_core.core.context import PipelineContext
-
 class FileJobContext(PipelineContext):
     file_path: str
     file_content: bytes
-    job_type: str
-    background_tasks: BackgroundTasks
+    job_id: UUID = Field(default_factory=uuid4)
 ```
 
-### Step 2: Define the Stage Interfaces
-
-Interfaces are the contracts for our plugins. The framework provides two: `Execute` for synchronous filters and `Dispatch` for asynchronous hand-offs.
-
+### 2. Execute Plugins
+Synchronous processing units (filters/transformers):
 ```python
-# distributed_core/core/interfaces.py
-from abc import ABC, abstractmethod
-from typing import Any, Callable, TypeVar
-from distributed_core.core.plugins import define_interface
-from distributed_core.core.context import PipelineContext
-
-ContextType = TypeVar("ContextType", bound=PipelineContext)
-
-@define_interface
-class Execute(ABC):
-    """A chainable filter/interceptor that calls `execute(next_fn, context)`."""
-    @abstractmethod
-    def execute(self, next_fn: Callable, context: ContextType) -> Any:
-        ...
-
-@define_interface
-class Dispatch(ABC):
-    """Hands off the rest of the pipeline for asynchronous execution via `dispatch(next_fn, context)`."""
-    @abstractmethod
-    def dispatch(self, next_fn: Callable, context: ContextType) -> Any:
-        ...
+class StorageWriter(Execute):
+    def execute(self, next_fn, context: FileJobContext):
+        # Save file to storage
+        minio_client.put_object(context.file_path, context.file_content)
+        return next_fn(context)  # Continue pipeline
 ```
 
-### Step 3: Create the Building Blocks (Plugins)
-
-Plugins are concrete implementations of our interfaces. Here, we'd have a `storage_write` plugin implementing `Execute` and a `schedule_job` plugin implementing `Dispatch`.
-
-*(Implementations for `storage_write` and `schedule_job` plugins would be here, registered with `@register_plugin`)*
-
-### Step 4: Assemble and Run the Pipeline
-
-Finally, we assemble the pipeline in our FastAPI application.
-
+### 3. Dispatch Plugins
+Terminal stages for async handoff:
 ```python
-# main.py
-from fastapi import FastAPI, BackgroundTasks, UploadFile
-from typing import Any
-from app.contexts import FileJobContext
-from distributed_core.core.interfaces import Execute, Dispatch
+class JobScheduler(Dispatch):
+    def dispatch(self, next_fn, context: FileJobContext):
+        # Enqueue remainder of pipeline
+        queue.enqueue(process_file, context.model_dump_json())
+```
+
+### 4. Pipeline Assembly
+Chain components declaratively:
+```python
+def process_file(context: FileJobContext):
+    pipeline = context.create_pipeline(final_fn=finalize_processing)
+    pipeline.chain(Execute("validate"))
+          .chain(Execute("encrypt"))
+          .chain(Dispatch("schedule_processing"))
+```
+
+## Quick Start
+
+### Installation
+```bash
+pip install distributed-core
+```
+
+### Example: File Processing Pipeline
+```python
+from fastapi import FastAPI, UploadFile
+from distributed_core import PipelineContext, Execute, Dispatch
 
 app = FastAPI()
 
+# 1. Define Context
+class FileContext(PipelineContext):
+    content: bytes
+    filename: str
+    processed: bool = False
+
+# 2. Create Plugins
+@register_plugin
+class Archiver(Execute):
+    def execute(self, next_fn, context: FileContext):
+        save_to_cloud_storage(context.filename, context.content)
+        return next_fn(context)
+
+@register_plugin
+class NotifyUser(Dispatch):
+    def dispatch(self, next_fn, context: FileContext):
+        send_email(f"File {context.filename} processed!")
+        return {"status": "queued"}
+
+# 3. Build & Run Pipeline
 @app.post("/upload")
-async def upload_endpoint(background_tasks: BackgroundTasks, file: UploadFile) -> Any:
-    # 1. Build the request-scoped context
-    ctx = FileJobContext(
-        file_path=f"uploads/{file.filename}",
-        file_content=await file.read(),
-        job_type="fastapi",
-        background_tasks=background_tasks
-    )
-
-    # 2. Define the core business logic that runs last (in the background)
-    def core_finalize(context: FileJobContext) -> Any:
-        print(f"SUCCESS: Background processing for '{context.file_path}' is complete.")
-        return {"stored_path": context.file_path, "ok": True}
-
-    # 3. Create a pipeline and chain the stages
-    #    Execution order is top-to-bottom.
-    pipeline = ctx.create_pipeline(core_fn=core_finalize)
-    pipeline.chain(
-        Dispatch, plugin="schedule_job"
-    ).chain(
-        Execute,  plugin="storage_write"
-    ).chain(
-        Execute,  plugin="logging" # Example of another filter
-    )
-
-    # 4. Run the pipeline
-    # The 'schedule_job' dispatcher will intercept the call, schedule the rest
-    # of the chain to run in the background, and return immediately.
-    result = pipeline.run()
-    return result
-```
-
-This example demonstrates a clean separation of concerns. The endpoint is declarative, simply stating *what* needs to be done, while the underlying plugins handle *how* it gets done. You could swap storage backends or job runners with a one-line configuration change.
-
-## How It Works: Key Concepts
-
-*   **`PipelineContext`**: A Pydantic `BaseModel` that holds all the data for a given operation and can create a `Pipeline`.
-*   **`Pipeline`**: The orchestrator. You create it from a context, chain stages, and `run()` it.
-*   **`Execute`**: An interface for synchronous, chainable filters. Each `execute` method must call the `next_fn` to continue the pipeline.
-*   **`Dispatch`**: An interface for a stage that hands off the remainder of the pipeline for asynchronous execution. Its `dispatch` method schedules the `next_fn` to run in a background process (e.g., using FastAPI's BackgroundTasks or a Celery worker) and typically returns immediately. A pipeline can only have one `Dispatch` stage.
-*   **`@define_interface`**: A decorator that marks an abstract class as a contract for plugins.
-*   **`@register_plugin`**: A decorator that registers a concrete class as an implementation of an interface, giving it a unique name (e.g., "minio").
-*   **`PluginFactory`**: A factory that instantiates plugins on demand. The `Pipeline` uses this to create the stages you chain.
-
-## 🚀 Installation
-
-This library is intended to be installed as a dependency in your Python projects.
-
-```bash
-pip install .
-```
-
-## 🛠️ Core Services
-
-`distributed-core` comes with several pre-built interfaces and plugins for common distributed system patterns:
-
-*   **Storage**: `StorageInterface` with `minio` and `local_file_storage` implementations.
-*   **Events**: `EventBusInterface` with a `redis` implementation for pub/sub messaging.
-*   **Jobs**: `JobInterface` and `JobStorageInterface` with `fastapi`, `in_memory`, and `redis` implementations.
-
-*(Note: These services will be adapted to the new Execute/Dispatch plugin model.)*
-
-## Future Features:
-
-### Execution Order Clarification
-
-**Dispatch Behavior:**
-
-The core ambiguity was whether Dispatch terminates or backgrounds the pipeline. Since it backgrounds execution:
-```python
-pipeline.chain(Dispatch("schedule_job"))  // Backgrounds subsequent stages
-        .chain(Execute("storage_write"))   // Runs in background
-        .chain(Execute("logging"))         // Runs in background
-```
-**Recommendation:** Explicitly document that:
-
-- Stages chained after Dispatch run in the background context
-- Stages before Dispatch run synchronously
-
-**Pipeline Visualization:**
-
-Add pipeline diagrams showing sync vs async boundaries:
-```text
-[Sync] → [Dispatch] → |Async Boundary| → [Background Stages]
-```
-
-### Enhanced Error Handling Architecture
-
-**Error Propagation:**
-
-Implement pipeline-wide error bus:
-```python
-class ErrorHandler(Execute):
-    def execute(self, next_fn, context):
-        try:
-            return next_fn(context)
-        except Exception as e:
-            context.error_bus.report(e)
-            raise
-```
-
-**Recovery Mechanisms:**
-
-Add `@retry` policy to plugin interfaces:
-```python
-@define_interface
-class Execute(ABC):
-    retry_policy: RetryPolicy = RetryPolicy(backoff=1.5, attempts=3)
-```
-
-**Dead Letter Queues:**
-
-Integrate with `EventBusInterface` for failed contexts:
-```python
-class DeadLetterPlugin(Dispatch):
-    def dispatch(self, next_fn, context):
-        if context.failed:
-            self.event_bus.publish("dlq", context)
-```
-
-### Concurrency & Resource Management
-
-**Resource Locking:**
-
-Add advisory locking interface:
-```python
-class LockingPlugin(Execute):
-    def execute(self, next_fn, context):
-        with self.distributed_lock(context.job_id):
-            return next_fn(context)
-```
-Provide implementations for Redis/DB-based locks
-
-**Lifecycle Hooks:**
-
-Mandate context managers for resource-heavy plugins:
-```python
-class StorageInterface(Execute):
-    def __enter__(self):
-        self._connect()
+async def upload(file: UploadFile):
+    ctx = FileContext(content=await file.read(), filename=file.filename)
     
-    def __exit__(self, *exc):
-        self._release()
+    pipeline = ctx.create_pipeline()
+    pipeline.chain(Execute("archiver")).chain(Dispatch("notify_user"))
+    
+    return pipeline.run()
 ```
 
-**Connection Pooling:**
+## Key Features
 
-Add `PluginPool` factory for stateful resources:
+### 🧩 Pluggable Components
 ```python
-plugin = plugin_pool.acquire(StorageInterface, "minio")
-try:
-    pipeline.run()
-finally:
-    plugin_pool.release(plugin)
+# Swap implementations via configuration
+pipeline.chain(Execute("storage", plugin="s3"))  # → s3, minio, gcs, local
+        .chain(Dispatch("jobs", plugin="celery")) # → celery, rq, fastapi_background
 ```
 
-### ⚙️ Type Safety Improvements
+### 🔗 Distributed Execution
+```mermaid
+sequenceDiagram
+    HTTP Request->>+Execute: Validate
+    Execute->>+Dispatch: Prepare context
+    Dispatch-->>-HTTP: Immediate response
+    Dispatch->>Background: Serialize context
+    Background->>Execute: Process file
+    Execute->>Execute: Encrypt
+    Execute->>Dispatch: Send notification
+```
 
-**Generic Context Binding:**
+### 🛡️ Upcoming Production Features
 ```python
-T = TypeVar("T", bound=PipelineContext)
+# Phase 1 (v1.1)
+pipeline.error_handler(DeadLetterQueue("dlq_topic"))
 
-class Execute(ABC):
-    @abstractmethod
-    def execute(self, next_fn: Callable[[T], T], context: T) -> T:
-        ...
+# Phase 2 (v1.2)
+with DistributedLock(resource="s3_bucket", timeout=10):
+    pipeline.chain(Execute("critical_operation"))
+    
+# Phase 3 (v1.3)
+pipeline.instrument(OpenTelemetryCollector())
 ```
 
-**Context Versioning:**
+## Documentation Roadmap
 
-Add version field to `PipelineContext`:
-```python
-class PipelineContext(BaseModel):
-    __version__: str = "1.0"
-```
+| Version | Features |
+|---------|----------|
+| `v1.0` | Core pipeline execution, FastAPI integration |
+| `v1.1` | Error handling, retry policies, dead-letter queues |
+| `v1.2` | Distributed locking, connection pooling |
+| `v1.3` | OpenTelemetry integration, sharding support |
 
-### Distributed-First Enhancements
+**[Explore Full Documentation](https://github.com/yourorg/distributed-core/wiki)** (Coming Soon)
 
-**Context Serialization:**
+## Contributing
 
-Auto-implement serialization for job queues:
-```python
-context.model_dump_json()  # For job enqueueing
-```
+We welcome contributions! Follow these steps:
 
-**Sharding Support:**
+1. Fork the repository
+2. Install dev dependencies:
+   ```bash
+   pip install -e ".[dev]"
+   ```
+3. Run tests:
+   ```bash
+   pytest -xvs
+   ```
+4. Submit a PR with tests
 
-Add partition keys to context:
-```python
-class FileJobContext(PipelineContext):
-    @property
-    def shard_key(self):
-        return hash(self.file_path) % 1024
-```
+> **Note**: This project adheres to [Semantic Versioning](https://semver.org/).  
+> Currently in **alpha** (v0.1.0) - interfaces may change until v1.0.
 
-**Observability Hooks:**
+## License
 
-Integrate OpenTelemetry:
-```python
-class TracingPlugin(Execute):
-    def execute(self, next_fn, context):
-        with tracer.start_as_current_span("storage_write"):
-            return next_fn(context)
-```
+Distributed under MIT License. See `LICENSE` for details.
 
-### ✅ Recommended Implementation Priorities
+---
 
-**Pipeline Integrity:**
-
-- Enforce stage ordering constraints (e.g., single Dispatch)
-- Add pipeline visualizer for debugging
-
-**Error Subsystem:**
-
-- Implement retry policies + dead letter queues
-- Standardize error reporting interface
-
-**Concurrency Primitives:**
-
-- Ship with Redis lock implementation
-- Add connection pooling reference implementation
-
-**Distributed Testing:**
-
-- Provide simulated distributed environment
-- Chaos testing helpers (network partitions, latency injection)
-
-This refined architecture maintains your pluggable design while adding crucial production-grade capabilities. The key evolution is treating pipelines as distributed transactions requiring:
-
-- Atomic execution phases
-- Cross-stage error propagation
-- Coordinated resource locking
-- Observable state transitions
-
-## 🧑‍💻 Development
-
-To set up a local development environment, you will need Docker and Docker Compose to run dependent services like Redis and MinIO.
-
-An example `docker-compose.yml` for development:
-
-```yaml
-services:
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  minio:
-    image: quay.io/minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-
-volumes:
-  redis_data:
-  minio_data:
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+**Ready to build resilient data pipelines?**  
+⭐ Star this repo to stay updated on our progress!
