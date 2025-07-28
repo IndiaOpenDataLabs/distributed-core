@@ -17,7 +17,7 @@ Let's demonstrate the power of this approach with a common use case: creating a 
 We want an endpoint `/upload` that:
 1.  Receives binary file content and creates a `FileJobContext`.
 2.  Uses an `Execute` plugin (`storage_write`) to save the file to a storage backend.
-3.  Uses a `Dispatch` plugin (`schedule_job`) to enqueue the next processing step.
+3.  Uses a `Dispatch` plugin (`schedule_job`) to enqueue the rest of the pipeline for background processing.
 4.  Returns a job ID to the client immediately.
 
 ### Step 1: Define the Context
@@ -38,26 +38,29 @@ class FileJobContext(PipelineContext):
 
 ### Step 2: Define the Stage Interfaces
 
-Interfaces are the contracts for our plugins. The framework provides two: `Execute` for synchronous filters and `Dispatch` for terminal, often asynchronous, stages.
+Interfaces are the contracts for our plugins. The framework provides two: `Execute` for synchronous filters and `Dispatch` for asynchronous hand-offs.
 
 ```python
 # distributed_core/core/interfaces.py
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 from distributed_core.core.plugins import define_interface
+from distributed_core.core.context import PipelineContext
+
+ContextType = TypeVar("ContextType", bound=PipelineContext)
 
 @define_interface
 class Execute(ABC):
     """A chainable filter/interceptor that calls `execute(next_fn, context)`."""
     @abstractmethod
-    def execute(self, next_fn: Callable, context: Any) -> Any:
+    def execute(self, next_fn: Callable, context: ContextType) -> Any:
         ...
 
 @define_interface
 class Dispatch(ABC):
-    """Terminates the pipeline by dispatching to an external system via `dispatch(next_fn, context)`."""
+    """Hands off the rest of the pipeline for asynchronous execution via `dispatch(next_fn, context)`."""
     @abstractmethod
-    def dispatch(self, next_fn: Callable, context: Any) -> Any:
+    def dispatch(self, next_fn: Callable, context: ContextType) -> Any:
         ...
 ```
 
@@ -90,7 +93,7 @@ async def upload_endpoint(background_tasks: BackgroundTasks, file: UploadFile) -
         background_tasks=background_tasks
     )
 
-    # 2. Define the core business logic that runs last
+    # 2. Define the core business logic that runs last (in the background)
     def core_finalize(context: FileJobContext) -> Any:
         print(f"SUCCESS: Background processing for '{context.file_path}' is complete.")
         return {"stored_path": context.file_path, "ok": True}
@@ -107,8 +110,8 @@ async def upload_endpoint(background_tasks: BackgroundTasks, file: UploadFile) -
     )
 
     # 4. Run the pipeline
-    # The 'schedule_job' dispatcher will intercept the call and run the rest
-    # of the chain in the background, returning immediately.
+    # The 'schedule_job' dispatcher will intercept the call, schedule the rest
+    # of the chain to run in the background, and return immediately.
     result = pipeline.run()
     return result
 ```
@@ -120,7 +123,7 @@ This example demonstrates a clean separation of concerns. The endpoint is declar
 *   **`PipelineContext`**: A Pydantic `BaseModel` that holds all the data for a given operation and can create a `Pipeline`.
 *   **`Pipeline`**: The orchestrator. You create it from a context, chain stages, and `run()` it.
 *   **`Execute`**: An interface for synchronous, chainable filters. Each `execute` method must call the `next_fn` to continue the pipeline.
-*   **`Dispatch`**: An interface for a terminal stage that hands off processing. It does not have to call `next_fn`, but typically does so in a different context (e.g., a background thread). A pipeline can only have one `Dispatch` stage.
+*   **`Dispatch`**: An interface for a stage that hands off the remainder of the pipeline for asynchronous execution. Its `dispatch` method schedules the `next_fn` to run in a background process (e.g., using FastAPI's BackgroundTasks or a Celery worker) and typically returns immediately. A pipeline can only have one `Dispatch` stage.
 *   **`@define_interface`**: A decorator that marks an abstract class as a contract for plugins.
 *   **`@register_plugin`**: A decorator that registers a concrete class as an implementation of an interface, giving it a unique name (e.g., "minio").
 *   **`PluginFactory`**: A factory that instantiates plugins on demand. The `Pipeline` uses this to create the stages you chain.
