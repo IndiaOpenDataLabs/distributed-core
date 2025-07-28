@@ -4,7 +4,7 @@ distributed_core/plugins.py
 An interface-aware, contract-enforcing plugin system.
 """
 
-import abc
+from abc import ABC
 from typing import Any, Dict, List, Type, TypeVar
 
 T = TypeVar("T")
@@ -40,7 +40,7 @@ class _PluginRegistry:
         """
         A decorator to register and define the contract for an interface.
         """
-        if not issubclass(interface_class, abc.ABC):
+        if not issubclass(interface_class, ABC):
             raise TypeError("Interfaces must be an Abstract Base Class (ABC).")
 
         # Find all abstract methods to define the contract

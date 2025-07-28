@@ -8,7 +8,9 @@ Defines the interface for task behaviors.
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
+from distributed_core.core.plugins import define_interface
 
+@define_interface
 class Behavior(ABC):
     """
     The interface for a behavior that can be added to a Task.
