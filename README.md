@@ -146,6 +146,179 @@ pip install .
 
 *(Note: These services will be adapted to the new Execute/Dispatch plugin model.)*
 
+## Future Features: Revised Architecture Review
+
+Based on your clarifications, here's a refined assessment focusing on execution flow, error handling, and concurrency:
+### Execution Order Clarification
+
+**Dispatch Behavior:**
+
+The core ambiguity was whether Dispatch terminates or backgrounds the pipeline. Since it backgrounds execution:
+```python
+pipeline.chain(Dispatch("schedule_job"))  // Backgrounds subsequent stages
+        .chain(Execute("storage_write"))   // Runs in background
+        .chain(Execute("logging"))         // Runs in background
+```
+**Recommendation:** Explicitly document that:
+
+- Stages chained after Dispatch run in the background context
+- Stages before Dispatch run synchronously
+
+**Pipeline Visualization:**
+
+Add pipeline diagrams showing sync vs async boundaries:
+```text
+[Sync] → [Dispatch] → |Async Boundary| → [Background Stages]
+```
+
+### Enhanced Error Handling Architecture
+
+**Error Propagation:**
+
+Implement pipeline-wide error bus:
+```python
+class ErrorHandler(Execute):
+    def execute(self, next_fn, context):
+        try:
+            return next_fn(context)
+        except Exception as e:
+            context.error_bus.report(e)
+            raise
+```
+
+**Recovery Mechanisms:**
+
+Add `@retry` policy to plugin interfaces:
+```python
+@define_interface
+class Execute(ABC):
+    retry_policy: RetryPolicy = RetryPolicy(backoff=1.5, attempts=3)
+```
+
+**Dead Letter Queues:**
+
+Integrate with `EventBusInterface` for failed contexts:
+```python
+class DeadLetterPlugin(Dispatch):
+    def dispatch(self, next_fn, context):
+        if context.failed:
+            self.event_bus.publish("dlq", context)
+```
+
+### Concurrency & Resource Management
+
+**Resource Locking:**
+
+Add advisory locking interface:
+```python
+class LockingPlugin(Execute):
+    def execute(self, next_fn, context):
+        with self.distributed_lock(context.job_id):
+            return next_fn(context)
+```
+Provide implementations for Redis/DB-based locks
+
+**Lifecycle Hooks:**
+
+Mandate context managers for resource-heavy plugins:
+```python
+class StorageInterface(Execute):
+    def __enter__(self):
+        self._connect()
+    
+    def __exit__(self, *exc):
+        self._release()
+```
+
+**Connection Pooling:**
+
+Add `PluginPool` factory for stateful resources:
+```python
+plugin = plugin_pool.acquire(StorageInterface, "minio")
+try:
+    pipeline.run()
+finally:
+    plugin_pool.release(plugin)
+```
+
+### ⚙️ Type Safety Improvements
+
+**Generic Context Binding:**
+```python
+T = TypeVar("T", bound=PipelineContext)
+
+class Execute(ABC):
+    @abstractmethod
+    def execute(self, next_fn: Callable[[T], T], context: T) -> T:
+        ...
+```
+
+**Context Versioning:**
+
+Add version field to `PipelineContext`:
+```python
+class PipelineContext(BaseModel):
+    __version__: str = "1.0"
+```
+
+### Distributed-First Enhancements
+
+**Context Serialization:**
+
+Auto-implement serialization for job queues:
+```python
+context.model_dump_json()  # For job enqueueing
+```
+
+**Sharding Support:**
+
+Add partition keys to context:
+```python
+class FileJobContext(PipelineContext):
+    @property
+    def shard_key(self):
+        return hash(self.file_path) % 1024
+```
+
+**Observability Hooks:**
+
+Integrate OpenTelemetry:
+```python
+class TracingPlugin(Execute):
+    def execute(self, next_fn, context):
+        with tracer.start_as_current_span("storage_write"):
+            return next_fn(context)
+```
+
+### ✅ Recommended Implementation Priorities
+
+**Pipeline Integrity:**
+
+- Enforce stage ordering constraints (e.g., single Dispatch)
+- Add pipeline visualizer for debugging
+
+**Error Subsystem:**
+
+- Implement retry policies + dead letter queues
+- Standardize error reporting interface
+
+**Concurrency Primitives:**
+
+- Ship with Redis lock implementation
+- Add connection pooling reference implementation
+
+**Distributed Testing:**
+
+- Provide simulated distributed environment
+- Chaos testing helpers (network partitions, latency injection)
+
+This refined architecture maintains your pluggable design while adding crucial production-grade capabilities. The key evolution is treating pipelines as distributed transactions requiring:
+
+- Atomic execution phases
+- Cross-stage error propagation
+- Coordinated resource locking
+- Observable state transitions
+
 ## 🧑‍💻 Development
 
 To set up a local development environment, you will need Docker and Docker Compose to run dependent services like Redis and MinIO.
