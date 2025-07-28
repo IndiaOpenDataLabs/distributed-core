@@ -146,9 +146,8 @@ pip install .
 
 *(Note: These services will be adapted to the new Execute/Dispatch plugin model.)*
 
-## Future Features: Revised Architecture Review
+## Future Features:
 
-Based on your clarifications, here's a refined assessment focusing on execution flow, error handling, and concurrency:
 ### Execution Order Clarification
 
 **Dispatch Behavior:**
