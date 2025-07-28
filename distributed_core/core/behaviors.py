@@ -25,3 +25,19 @@ class Behavior(ABC):
         Executes the behavior's logic and calls the next function in the chain.
         """
         raise NotImplementedError
+
+
+# @define_interface
+# class Execute(ABC):
+#     """A chainable filter/interceptor."""
+#     @abstractmethod
+#     def execute(self, next_fn: Callable, context: Context) -> Any:
+#         ...
+
+# @define_interface
+# class Dispatch(ABC):
+#     """Terminates the chain by dispatching to an external system."""
+#     @abstractmethod
+#     def execute(self, next_fn: Callable, context: Context) -> Any:
+#         ...
+
