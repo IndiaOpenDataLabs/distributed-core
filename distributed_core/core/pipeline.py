@@ -3,12 +3,13 @@ from functools import wraps
 from typing import Any, Callable, List, Type
 
 from distributed_core.core.plugins import PluginFactory
-from distributed_core.core.behaviors import MiddlewareBehavior, TerminatorBehavior
+from distributed_core.core.execute import Execute
+from distributed_core.core.dispatch import Dispatch
 
 class Pipeline:
     """
-    Orchestrates a context through a series of chained filters (MiddlewareBehavior)
-    and an optional final handoff (TerminatorBehavior). Filters call `execute(...)` and
+    Orchestrates a context through a series of chained filters (Execute)
+    and an optional final handoff (Dispatch). Filters call `execute(...)` and
     the handoff calls `dispatch(...)`. Behaviors execute in the order chained.
     """
 
@@ -18,9 +19,9 @@ class Pipeline:
         # The core function to call after middleware (must be set)
         self._func: Callable[[Any], Any] | None = None
         # Preserves middleware behaviors in chain order
-        self._middlewares: List[MiddlewareBehavior] = []
-        # At most one TerminatorBehavior
-        self._terminator: TerminatorBehavior | None = None
+        self._middlewares: List[Execute] = []
+        # At most one Dispatch
+        self._terminator: Dispatch | None = None
 
     def set_core(self, func: Callable[[Any], Any]) -> "Pipeline":
         """
@@ -40,14 +41,14 @@ class Pipeline:
         """
         Add a filter or handoff stage to the pipeline.
 
-        :param behavior_interface: MiddlewareBehavior or TerminatorBehavior
+        :param behavior_interface: Execute or Dispatch
         :param plugin: name of the registered plugin
         :param config: passed to the plugin constructor
         """
         beh = PluginFactory.get(behavior_interface, plugin, **config)
-        if isinstance(beh, TerminatorBehavior):
+        if isinstance(beh, Dispatch):
             if self._terminator is not None:
-                raise RuntimeError("Only one TerminatorBehavior allowed")
+                raise RuntimeError("Only one Dispatch allowed")
             self._terminator = beh
         else:
             self._middlewares.append(beh)

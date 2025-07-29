@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, TypeVar
 from pydantic import BaseModel
-from distributed_core.tasks import Task
+from distributed_core.core.pipeline import Pipeline
 
 C = TypeVar("C", bound="TaskContext")
 
@@ -12,19 +12,19 @@ class TaskContext(BaseModel, ABC):
     """
 
     @abstractmethod
-    def create_task(
+    def create_pipeline(
         self: C,
         core_fn: Callable[[C], Any] | None = None
-    ) -> Task:
+    ) -> Pipeline:
         ...
 
-    def create_task(self: C, core_fn=None) -> Task:
-        # default core just returns the context dict (or add a status field)
-        def result(ctx: C):
-            return ctx.dict()
-        fn = core_fn or result
-        from distributed_core.core.behaviors import Behavior
-        return Task(fn, self)
+    # def create_task(self: C, core_fn=None) -> Task:
+    #     # default core just returns the context dict (or add a status field)
+    #     def result(ctx: C):
+    #         return ctx.dict()
+    #     fn = core_fn or result
+    #     from distributed_core.core.behaviors import Behavior
+    #     return Task(fn, self)
     
 
 # # app/contexts.py
