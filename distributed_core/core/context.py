@@ -4,11 +4,11 @@ from typing import Any, Callable, TypeVar
 from pydantic import BaseModel
 from distributed_core.core.pipeline import Pipeline
 
-C = TypeVar("C", bound="TaskContext")
+C = TypeVar("C", bound="PipelineContext")
 
-class TaskContext(BaseModel, ABC):
+class PipelineContext(BaseModel, ABC):
     """
-    Any Pydantic context that can spawn a Task.
+    Any Pydantic context that can spawn a Pipeline.
     """
 
     @abstractmethod
